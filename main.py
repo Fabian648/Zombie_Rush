@@ -1,61 +1,86 @@
 import pygame
 import sys
+import random
 
-# Pygame initialisieren
 pygame.init()
 
 # Fenstergröße
 WIDTH, HEIGHT = 800, 400
 win = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Side-Scroller mit Sprung")
+pygame.display.set_caption("Zombie Side-Scroller")
 
 # Farben
 WHITE = (255, 255, 255)
 
-# FPS und Clock
-FPS = 60
+# Clock & FPS
 clock = pygame.time.Clock()
+FPS = 60
 
 # Physik
 GRAVITY = 0.8
 JUMP_POWER = 15
 
-# Spieler-Parameter
-player_pos_x = 100
-player_pos_y = 0
-player_speed = 5
-player_width = 50
-player_height = 70
+# Bodenhöhe
+GROUND_HEIGHT = 64
+GROUND_Y = HEIGHT - GROUND_HEIGHT
 
+# Spielergröße
+PLAYER_WIDTH = 64
+PLAYER_HEIGHT = 96
+
+# Zombiegröße
+ZOMBIE_WIDTH = 64
+ZOMBIE_HEIGHT = 128
+
+# Spielerposition
+player_x = 100
+player_y = GROUND_Y - PLAYER_HEIGHT
 player_vel_y = 0
-on_ground = False
+player_speed = 5
+on_ground = True
 
-# Bodenhöhe (y-Koordinate)
-GROUND_LEVEL = HEIGHT - 50
-
-# Grafiken laden
+# Sprites laden und skalieren
 player_img = pygame.image.load("assets/player.png")
-player_img = pygame.transform.scale(player_img, (player_width, player_height))
+player_img = pygame.transform.scale(player_img, (PLAYER_WIDTH, PLAYER_HEIGHT))
 
 ground_img = pygame.image.load("assets/ground.png")
-ground_img = pygame.transform.scale(ground_img, (WIDTH, 50))
+ground_img = pygame.transform.scale(ground_img, (WIDTH, GROUND_HEIGHT))
 
-def draw():
+zombie_img = pygame.image.load("assets/zombie.png")
+zombie_img = pygame.transform.scale(zombie_img, (ZOMBIE_WIDTH, ZOMBIE_HEIGHT))
+
+# Zombie-Verwaltung
+zombies = []
+SPAWN_EVENT = pygame.USEREVENT + 1
+pygame.time.set_timer(SPAWN_EVENT, 3000)  # alle 3 Sekunden spawnt ein Zombie
+
+def spawn_zombie():
+    zombie = {
+        "x": WIDTH + random.randint(0, 200),
+        "y": GROUND_Y - ZOMBIE_HEIGHT,
+        "speed": random.randint(2, 4)
+    }
+    zombies.append(zombie)
+
+def draw_window():
     win.fill(WHITE)
-    # Boden zeichnen
-    win.blit(ground_img, (0, GROUND_LEVEL))
 
-    # Spieler zeichnen
-    win.blit(player_img, (player_pos_x, player_pos_y))
+    # Boden
+    win.blit(ground_img, (0, GROUND_Y))
+
+    # Spieler
+    win.blit(player_img, (player_x, player_y))
+
+    # Zombies
+    for zombie in zombies:
+        win.blit(zombie_img, (zombie["x"], zombie["y"]))
 
     pygame.display.update()
 
 def main():
-    global player_pos_x, player_pos_y, player_vel_y, on_ground
+    global player_x, player_y, player_vel_y, on_ground
 
     running = True
-    player_pos_y = GROUND_LEVEL - player_height  # Start auf dem Boden
-
     while running:
         clock.tick(FPS)
 
@@ -63,32 +88,40 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        keys = pygame.key.get_pressed()
-        # Links/Rechts Bewegung
-        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
-            player_pos_x -= player_speed
-        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
-            player_pos_x += player_speed
+            if event.type == SPAWN_EVENT:
+                spawn_zombie()
 
-        # Springen
+        # Steuerung
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            player_x -= player_speed
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            player_x += player_speed
         if (keys[pygame.K_SPACE] or keys[pygame.K_w] or keys[pygame.K_UP]) and on_ground:
             player_vel_y = -JUMP_POWER
             on_ground = False
 
-        # Schwerkraft anwenden
+        # Schwerkraft
         player_vel_y += GRAVITY
-        player_pos_y += player_vel_y
+        player_y += player_vel_y
 
-        # Boden Kollision
-        if player_pos_y + player_height >= GROUND_LEVEL:
-            player_pos_y = GROUND_LEVEL - player_height
+        # Kollision mit Boden
+        if player_y + PLAYER_HEIGHT >= GROUND_Y:
+            player_y = GROUND_Y - PLAYER_HEIGHT
             player_vel_y = 0
             on_ground = True
 
-        # Spielfeld Begrenzung horizontal
-        player_pos_x = max(0, min(WIDTH - player_width, player_pos_x))
+        # Bildschirmgrenzen
+        player_x = max(0, min(WIDTH - PLAYER_WIDTH, player_x))
 
-        draw()
+        # Zombies bewegen
+        for zombie in zombies[:]:
+            zombie["x"] -= zombie["speed"]
+            if zombie["x"] < -ZOMBIE_WIDTH:
+                zombies.remove(zombie)
+
+        # Fenster zeichnen
+        draw_window()
 
     pygame.quit()
     sys.exit()
